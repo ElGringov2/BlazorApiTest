@@ -1,0 +1,76 @@
+﻿@page "/wheater"
+@using System.Net.Http.Headers
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IHttpClientFactory httpclientfactory
+@inject AuthenticationService AuthenticationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IWeatherService WeatherService
+@rendermode InteractiveServer
+<AuthorizeView>
+    <Authorized>
+        <p>Hello, @context.User.Identity?.Name!</p>
+        @foreach (var weather in Weathers)
+        {
+            <div>@weather.Summary<br /></div>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <div>
+            Email:<input @bind="email" />
+        </div>
+        <div>
+            Password:   <input type="password" @bind="password" />
+        </div>
+        <div>
+            <button @onclick="SignIn">Sign in</button>
+        </div>
+        <p>You're not authorized.</p>
+    </NotAuthorized>
+</AuthorizeView>
+<a href="/">Retour</a>
+@code {
+    private IEnumerable<WeatherForecast> Weathers = [];
+    public string email = "bob@bob.com";
+    public string password = "Azerty+01";
+
+    private string _userName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Weathers = await WeatherService.GetWeather();
+    }
+
+    private async Task SignIn()
+    {
+        try
+        {
+            using var httpclient = httpclientfactory.CreateClient("std");
+            var response = await httpclient.PostAsJsonAsync("/login", new { email = email, password = password });
+
+            if (response.IsSuccessStatusCode)
+            {
+                var tokenprovider = await response.Content.ReadFromJsonAsync<TokenProvider>();
+                httpclient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenprovider.accesstoken);
+                var userprofile = await httpclient.GetFromJsonAsync<UserProfile>("/profile");
+                //add some check here
+                var identity = new ClaimsIdentity(
+                 new[]
+                  {
+                new Claim(ClaimTypes.Name,  userprofile.UserName),
+                                              },
+               "Custom Authentication");
+
+                var newUser = new ClaimsPrincipal(identity) ;
+                AuthenticationService.accesstoken = tokenprovider.accesstoken;
+                AuthenticationService.refreshtoken = tokenprovider.refreshtoken;
+                AuthenticationService.CurrentUser = newUser;
+                Weathers = await WeatherService.GetWeather();
+            }
+        }
+        catch (Exception e)
+        {
+
+        }
+    }
+}

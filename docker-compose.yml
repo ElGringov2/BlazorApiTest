@@ -1,0 +1,15 @@
+services:
+  blazor:
+    image: ${DOCKER_REGISTRY-}blazor
+    build:
+      context: .
+      dockerfile: Blazor/Dockerfile
+
+  webapi:
+    image: ${DOCKER_REGISTRY-}webapi
+    ports:
+      - 12000:8080
+    build:
+      context: .
+      dockerfile: WebAPI/Dockerfile
+
